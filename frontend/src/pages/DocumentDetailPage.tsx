@@ -11,6 +11,7 @@ import {
   Grid,
   Card,
   CardContent,
+  CardActions,
   Divider,
   IconButton,
   Tooltip,
@@ -22,6 +23,20 @@ import {
   DialogActions,
   ToggleButtonGroup,
   ToggleButton,
+  Stack,
+  Chip,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  TextField,
+  useTheme,
+  useMediaQuery,
+  Fab,
+  Badge,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -36,6 +51,12 @@ import {
   Visibility as VisibilityIcon,
   BugReport as BugReportIcon,
   Edit as EditIcon,
+  Save as SaveIcon,
+  Cancel as CancelIcon,
+  ExpandMore as ExpandMoreIcon,
+  CheckCircle as CheckCircleIcon,
+  Error as ErrorIcon,
+  Pending as PendingIcon,
 } from '@mui/icons-material';
 import { api, documentApi } from '../services/api';
 import PdfViewer from '../components/PdfViewer';
@@ -82,6 +103,8 @@ interface SelectedBlock {
 const DocumentDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const [documentData, setDocumentData] = useState<Document | null>(null);
   const [loading, setLoading] = useState(true);
@@ -104,6 +127,10 @@ const DocumentDetailPage: React.FC = () => {
   const [showJsonView, setShowJsonView] = useState<{ [blockId: string]: boolean }>({});
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [blockToDelete, setBlockToDelete] = useState<SelectedBlock | null>(null);
+  
+  // レスポンシブ対応の追加ステート
+  const [expandedAccordion, setExpandedAccordion] = useState<string | false>(false);
+  const [showMobileActions, setShowMobileActions] = useState(false);
 
   useEffect(() => {
     // console.log('DocumentDetailPage useEffect triggered, id:', id);
@@ -521,74 +548,100 @@ const DocumentDetailPage: React.FC = () => {
   return (
     <Container maxWidth="xl">
       <Box my={3}>
-        <Box display="flex" alignItems="center" gap={2} sx={{ mb: 2 }}>
-          <Button
-            startIcon={<ArrowBackIcon />}
-            onClick={() => navigate('/documents')}
-          >
-            ドキュメント一覧に戻る
-          </Button>
-          <ApprovalStatusBadge documentId={documentData.id} />
+        {/* ヘッダー部分 */}
+        <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
+          <Box display="flex" alignItems="center" gap={2}>
+            <Button
+              startIcon={<ArrowBackIcon />}
+              onClick={() => navigate('/documents')}
+              variant="outlined"
+            >
+              戻る
+            </Button>
+            <Typography variant="h5" component="h1">
+              {documentData.fileName}
+            </Typography>
+          </Box>
+          <Box display="flex" alignItems="center" gap={2}>
+            <ApprovalStatusBadge documentId={documentData.id} />
+            <Chip
+              icon={selectedBlocks.length > 0 ? <CheckCircleIcon /> : <PendingIcon />}
+              label={`抽出済み: ${selectedBlocks.length}件`}
+              color={selectedBlocks.length > 0 ? 'success' : 'default'}
+              variant="outlined"
+            />
+          </Box>
         </Box>
 
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={8} sx={{ display: 'flex', flexDirection: 'column', height: 'calc(70vh + 120px)' }}>
-            <Paper sx={{ p: 2, flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h5">{documentData.fileName}</Typography>
-                <Box display="flex" alignItems="center" gap={2}>
-                  {/* モード切り替えコントロール */}
-                  <Box display="flex" alignItems="center">
-                    <ToggleButtonGroup
-                      value={mode}
-                      exclusive
-                      onChange={handleModeChange}
-                      size="small"
-                    >
-                      <ToggleButton value="move" aria-label="移動">
-                        <PanToolIcon sx={{ mr: 1 }} />
-                        移動
-                      </ToggleButton>
-                      <ToggleButton value="select" aria-label="範囲選択">
-                        <SelectionIcon sx={{ mr: 1 }} />
-                        範囲選択
-                      </ToggleButton>
-                    </ToggleButtonGroup>
-                  </Box>
-                  
-                  <Divider orientation="vertical" flexItem />
-                  
-                  {/* 自動OCRトグル */}
-                  <Box display="flex" alignItems="center">
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={autoOcr}
-                          onChange={(e) => setAutoOcr(e.target.checked)}
-                          size="small"
-                        />
-                      }
-                      label="自動OCR"
-                      sx={{ m: 0 }}
-                    />
-                  </Box>
-                </Box>
-              </Box>
-
-              <Divider sx={{ mb: 2 }} />
+        {/* コントロール部分 */}
+        <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
+          <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
+            <Box display="flex" alignItems="center" gap={2}>
+              <ToggleButtonGroup
+                value={mode}
+                exclusive
+                onChange={handleModeChange}
+                size="small"
+              >
+                <ToggleButton value="move" aria-label="移動">
+                  <PanToolIcon sx={{ mr: 1 }} />
+                  移動
+                </ToggleButton>
+                <ToggleButton value="select" aria-label="範囲選択">
+                  <SelectionIcon sx={{ mr: 1 }} />
+                  範囲選択
+                </ToggleButton>
+              </ToggleButtonGroup>
               
-              {/* 選択範囲のプレビュー（削除済み） */}
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={autoOcr}
+                    onChange={(e) => setAutoOcr(e.target.checked)}
+                    size="small"
+                  />
+                }
+                label="自動OCR"
+              />
+            </Box>
+            
+            {mode === 'select' && (
+              <Box display="flex" gap={1} flexWrap="wrap">
+                {documentData.template?.blocks?.map((block) => (
+                  <Chip
+                    key={block.block_id}
+                    label={block.label}
+                    onClick={() => {
+                      setCurrentBlockType(block.block_id);
+                      setMode('select');
+                    }}
+                    color={currentBlockType === block.block_id ? 'primary' : 'default'}
+                    variant={currentBlockType === block.block_id ? 'filled' : 'outlined'}
+                    clickable
+                  />
+                ))}
+              </Box>
+            )}
+          </Box>
+        </Paper>
 
-              {/* PDFビューアー全体コンテナ */}
-              <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                {/* PDFビューア */}
+        {/* メインコンテンツ */}
+        <Grid container spacing={3}>
+          {/* 左側：画像ビューエリア */}
+          <Grid item xs={12} md={8}>
+            <Paper elevation={1} sx={{ overflow: 'hidden' }}>
+              <Box sx={{ p: 2 }}>
+                <Typography variant="h6" gutterBottom>
+                  ドキュメント画像
+                </Typography>
                 <Box
                   sx={{
                     position: 'relative',
-                    overflow: 'hidden',
-                    flex: '1',
+                    overflow: 'auto',
+                    maxHeight: '70vh',
                     backgroundColor: '#f5f5f5',
                     border: '1px solid #ddd',
+                    borderRadius: 1,
                   }}
                 >
                   <PdfViewer
@@ -601,158 +654,108 @@ const DocumentDetailPage: React.FC = () => {
                     onSelectionComplete={handleSelectionComplete}
                   />
                 </Box>
-
-                {/* ページナビゲーションと拡大縮小コントロール */}
-                <Box display="flex" justifyContent="center" alignItems="center" gap={3} sx={{ py: 2, borderTop: '1px solid #e0e0e0', height: '120px', flexShrink: 0 }}>
+                
                 {/* ページナビゲーション */}
-                <Box display="flex" alignItems="center">
-                  <Tooltip title="前のページ">
-                    <span>
-                      <IconButton 
-                        onClick={handlePreviousPage} 
-                        disabled={currentPage <= 1}
-                      >
-                        <NavigateBeforeIcon />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                  <Typography component="span" sx={{ mx: 2, minWidth: '80px', textAlign: 'center' }}>
-                    {currentPage} / {documentData.pageCount}
-                  </Typography>
-                  <Tooltip title="次のページ">
-                    <span>
-                      <IconButton 
-                        onClick={handleNextPage} 
-                        disabled={currentPage >= documentData.pageCount}
-                      >
-                        <NavigateNextIcon />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                </Box>
-                
-                <Divider orientation="vertical" flexItem />
-                
-                {/* ズームコントロール */}
-                <Box display="flex" alignItems="center">
-                  <Tooltip title="ズームアウト">
-                    <IconButton onClick={handleZoomOut}>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mt={2} p={1}>
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <IconButton 
+                      onClick={handlePreviousPage} 
+                      disabled={currentPage <= 1}
+                      size="small"
+                    >
+                      <NavigateBeforeIcon />
+                    </IconButton>
+                    <Typography variant="body2" sx={{ minWidth: '80px', textAlign: 'center' }}>
+                      {currentPage} / {documentData.pageCount}
+                    </Typography>
+                    <IconButton 
+                      onClick={handleNextPage} 
+                      disabled={currentPage >= documentData.pageCount}
+                      size="small"
+                    >
+                      <NavigateNextIcon />
+                    </IconButton>
+                  </Box>
+                  
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <IconButton onClick={handleZoomOut} size="small">
                       <ZoomOutIcon />
                     </IconButton>
-                  </Tooltip>
-                  <Typography component="span" sx={{ mx: 2, minWidth: '60px', textAlign: 'center' }}>
-                    {Math.round(scale * 100)}%
-                  </Typography>
-                  <Tooltip title="ズームイン">
-                    <IconButton onClick={handleZoomIn}>
+                    <Typography variant="body2" sx={{ minWidth: '60px', textAlign: 'center' }}>
+                      {Math.round(scale * 100)}%
+                    </Typography>
+                    <IconButton onClick={handleZoomIn} size="small">
                       <ZoomInIcon />
                     </IconButton>
-                  </Tooltip>
-                </Box>
+                  </Box>
                 </Box>
               </Box>
-
             </Paper>
           </Grid>
 
+          {/* 右側：抽出結果・詳細編集エリア */}
           <Grid item xs={12} md={4}>
-            {/* スクロール可能な統合パネル */}
-            <Box
-              sx={{
-                height: 'calc(70vh + 120px)', // PDFビューアー全体コンテナと同じ高さ
-                overflowY: 'auto',
-                '&::-webkit-scrollbar': {
-                  width: '8px',
-                },
-                '&::-webkit-scrollbar-track': {
-                  backgroundColor: '#f1f1f1',
-                  borderRadius: '4px',
-                },
-                '&::-webkit-scrollbar-thumb': {
-                  backgroundColor: '#888',
-                  borderRadius: '4px',
-                  '&:hover': {
-                    backgroundColor: '#555',
-                  },
-                },
-              }}
-            >
-              {/* ブロック選択パネル */}
-              <Card sx={{ mb: 2 }}>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    範囲ブロック選択
-                  </Typography>
-                  {mode === 'select' && !currentBlockType && (
-                    <Typography variant="body2" color="primary" sx={{ mb: 2 }}>
-                      範囲選択モードです。抽出したいブロックタイプを選択してください。
-                    </Typography>
-                  )}
-                  {mode === 'select' && currentBlockType && (
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      💡 ヒント：文字が含まれる領域を十分な大きさで選択してください。
-                    </Typography>
-                  )}
-                  {mode === 'move' && (
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      移動モードです。PDFをパン・ズームできます。
-                    </Typography>
-                  )}
-                  {documentData.template?.blocks?.map((block) => (
-                    <Button
-                      key={block.block_id}
-                      variant={currentBlockType === block.block_id ? 'contained' : 'outlined'}
-                      fullWidth
-                      sx={{ mb: 1 }}
-                      onClick={() => {
-                        setCurrentBlockType(block.block_id);
-                        // ブロックを選択したら自動的に範囲選択モードに切り替え
-                        setMode('select');
-                      }}
-                    >
-                      {block.label}
-                    </Button>
-                  ))}
-                </CardContent>
-              </Card>
-
-              {/* 選択済みブロック一覧 */}
-              <Card>
-                <CardContent>
+            <Stack spacing={2}>
+              {/* 抽出結果セクション */}
+              <Paper elevation={1}>
+                <Box sx={{ p: 2 }}>
                   <Typography variant="h6" gutterBottom>
                     抽出結果
                   </Typography>
                   {selectedBlocks.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary">
-                      範囲を選択すると、ここに結果が表示されます
-                    </Typography>
+                    <Box textAlign="center" py={3}>
+                      <Typography variant="body2" color="text.secondary">
+                        範囲を選択すると、ここに結果が表示されます
+                      </Typography>
+                    </Box>
                   ) : (
-                    selectedBlocks.map((block, index) => {
-                      // console.log(`Rendering block ${index}:`, block);
-                      // console.log(`Block isProcessing: ${block.isProcessing}, extractionResult:`, block.extractionResult);
-                      const blockDef = documentData.template?.blocks?.find(b => b.block_id === block.blockId);
-                      return (
-                        <Box key={index} sx={{ mb: 3, p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
-                          <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-                            <Box display="flex" alignItems="center" gap={1}>
-                              <Typography variant="subtitle2" color="primary">
-                                {blockDef?.label}
-                              </Typography>
-                              {block.extractionId && (
-                                <Typography variant="caption" color="success.main" sx={{ 
-                                  backgroundColor: 'success.light', 
-                                  px: 1, 
-                                  borderRadius: 1,
-                                  fontSize: '0.7rem'
-                                }}>
-                                  保存済み
-                                </Typography>
-                              )}
-                            </Box>
-                            <Box>
-                              {/* 手動OCRボタン（自動OCRがOFFまたは処理失敗時） */}
-                              {(!autoOcr || (!block.extractionResult && !block.isProcessing)) && (
-                                <Tooltip title="OCRを実行">
+                    <List dense>
+                      {selectedBlocks.map((block, index) => {
+                        const blockDef = documentData.template?.blocks?.find(b => b.block_id === block.blockId);
+                        return (
+                          <ListItem key={index} divider>
+                            <ListItemText
+                              primary={blockDef?.label}
+                              secondary={
+                                <Box display="flex" alignItems="center" gap={1} mt={0.5}>
+                                  {block.isProcessing ? (
+                                    <>
+                                      <CircularProgress size={16} />
+                                      <Typography variant="caption" color="text.secondary">
+                                        処理中...
+                                      </Typography>
+                                    </>
+                                  ) : block.extractionResult && !block.extractionResult.error ? (
+                                    <Chip
+                                      icon={<CheckCircleIcon />}
+                                      label="抽出完了"
+                                      size="small"
+                                      color="success"
+                                      variant="outlined"
+                                    />
+                                  ) : block.extractionResult?.error ? (
+                                    <Chip
+                                      icon={<ErrorIcon />}
+                                      label="エラー"
+                                      size="small"
+                                      color="error"
+                                      variant="outlined"
+                                    />
+                                  ) : (
+                                    <Chip
+                                      icon={<PendingIcon />}
+                                      label="待機中"
+                                      size="small"
+                                      color="default"
+                                      variant="outlined"
+                                    />
+                                  )}
+                                </Box>
+                              }
+                            />
+                            <ListItemSecondaryAction>
+                              <Box display="flex" gap={0.5}>
+                                {(!autoOcr || (!block.extractionResult && !block.isProcessing)) && (
                                   <IconButton 
                                     size="small" 
                                     onClick={() => handleManualOCR(block)}
@@ -760,49 +763,7 @@ const DocumentDetailPage: React.FC = () => {
                                   >
                                     <PlayArrowIcon />
                                   </IconButton>
-                                </Tooltip>
-                              )}
-                              
-                              {/* 点検補正ボタン（JSON表示時のみ表示） */}
-                              {(block.extractionResult && !block.extractionResult.error && !block.isProcessing && showJsonView[block.blockId]) && (
-                                <Tooltip title="点検補正">
-                                  <IconButton 
-                                    size="small" 
-                                    onClick={() => handleEditOcrResult(block)}
-                                    color={block.extractionId ? "primary" : "default"}
-                                  >
-                                    <EditIcon />
-                                  </IconButton>
-                                </Tooltip>
-                              )}
-                              
-                              {/* JSON表示/非表示切り替えボタン（点検補正表示時のみ表示） */}
-                              {(block.extractionResult && !block.extractionResult.error && !block.isProcessing && !showJsonView[block.blockId]) && (
-                                <Tooltip title="JSON表示に切り替え">
-                                  <IconButton 
-                                    size="small" 
-                                    onClick={() => toggleJsonView(block.blockId)}
-                                    color="default"
-                                  >
-                                    <VisibilityIcon />
-                                  </IconButton>
-                                </Tooltip>
-                              )}
-                              
-                              {/* デバッグプレビューボタン */}
-                              {(block.croppedImageUrl || block.rawResponse) && (
-                                <Tooltip title="デバッグ情報を表示">
-                                  <IconButton 
-                                    size="small" 
-                                    onClick={() => handleDebugPreview(block)}
-                                  >
-                                    <BugReportIcon />
-                                  </IconButton>
-                                </Tooltip>
-                              )}
-                              
-                              {/* 削除ボタン */}
-                              <Tooltip title="この選択を削除">
+                                )}
                                 <IconButton 
                                   size="small" 
                                   onClick={() => handleDeleteBlock(block)}
@@ -810,103 +771,121 @@ const DocumentDetailPage: React.FC = () => {
                                 >
                                   <DeleteIcon />
                                 </IconButton>
-                              </Tooltip>
-                            </Box>
-                          </Box>
-                          
-                          {(() => {
-                            // console.log(`UI condition check - isProcessing: ${block.isProcessing}, extractionResult: ${!!block.extractionResult}`);
-                            
-                            if (block.isProcessing) {
-                              // console.log('Rendering: OCR processing...');
-                              return (
-                                <Box display="flex" alignItems="center" gap={1}>
-                                  <CircularProgress size={16} />
-                                  <Typography variant="body2" color="text.secondary">
-                                    OCR処理中...
-                                  </Typography>
-                                </Box>
-                              );
-                            } else if (block.extractionResult && !block.extractionResult.error) {
-                              // console.log('Rendering OCR result - showJsonView:', showJsonView[block.blockId]);
-                              
-                              // JSON表示が有効な場合はJSONを表示、そうでなければデフォルトで編集フォームを表示
-                              if (showJsonView[block.blockId]) {
-                                return (
-                                  <pre style={{ 
-                                    fontSize: '12px', 
-                                    overflow: 'auto', 
-                                    maxHeight: '200px',
-                                    backgroundColor: '#f5f5f5',
-                                    padding: '8px',
-                                    borderRadius: '4px',
-                                    margin: 0
-                                  }}>
-                                    {JSON.stringify(block.extractionResult, null, 2)}
-                                  </pre>
-                                );
-                              } else {
-                                // デフォルトで点検補正エディターを表示
-                                const blockDef = documentData?.template?.blocks?.find(b => b.block_id === block.blockId);
-                                if (blockDef) {
-                                  return (
+                              </Box>
+                            </ListItemSecondaryAction>
+                          </ListItem>
+                        );
+                      })}
+                    </List>
+                  )}
+                </Box>
+              </Paper>
+
+              {/* 詳細編集セクション */}
+              {selectedBlocks.length > 0 && (
+                <Paper elevation={1}>
+                  <Box sx={{ p: 2 }}>
+                    <Typography variant="h6" gutterBottom>
+                      詳細編集
+                    </Typography>
+                    <Stack spacing={2}>
+                      {selectedBlocks.map((block, index) => {
+                        const blockDef = documentData.template?.blocks?.find(b => b.block_id === block.blockId);
+                        if (!block.extractionResult || block.extractionResult.error) return null;
+                        
+                        return (
+                          <Accordion key={index} defaultExpanded={index === 0}>
+                            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                              <Box display="flex" alignItems="center" gap={1}>
+                                <Typography variant="subtitle2">
+                                  {blockDef?.label}
+                                </Typography>
+                                {block.extractionId && (
+                                  <Chip
+                                    label="保存済み"
+                                    size="small"
+                                    color="success"
+                                    variant="outlined"
+                                  />
+                                )}
+                              </Box>
+                            </AccordionSummary>
+                            <AccordionDetails>
+                              <Box sx={{ width: '100%' }}>
+                                {showJsonView[block.blockId] ? (
+                                  <Box>
+                                    <pre style={{ 
+                                      fontSize: '12px', 
+                                      overflow: 'auto', 
+                                      maxHeight: '200px',
+                                      backgroundColor: '#f5f5f5',
+                                      padding: '8px',
+                                      borderRadius: '4px',
+                                      margin: 0
+                                    }}>
+                                      {JSON.stringify(block.extractionResult, null, 2)}
+                                    </pre>
+                                    <Box mt={2} display="flex" gap={1}>
+                                      <Button
+                                        startIcon={<EditIcon />}
+                                        onClick={() => handleEditOcrResult(block)}
+                                        size="small"
+                                      >
+                                        編集
+                                      </Button>
+                                      <Button
+                                        startIcon={<BugReportIcon />}
+                                        onClick={() => handleDebugPreview(block)}
+                                        size="small"
+                                        variant="outlined"
+                                      >
+                                        デバッグ
+                                      </Button>
+                                    </Box>
+                                  </Box>
+                                ) : (
+                                  <Box>
                                     <OcrResultEditor
                                       block={block}
                                       blockDefinition={blockDef}
                                       onSave={handleSaveOcrCorrection}
-                                      onCancel={() => {}} // キャンセル機能は無効（常に編集モード）
+                                      onCancel={() => {}}
                                       templateName={documentData?.template?.name}
                                     />
-                                  );
-                                } else {
-                                  return (
-                                    <Typography variant="body2" color="error">
-                                      ブロック定義が見つかりません
-                                    </Typography>
-                                  );
-                                }
-                              }
-                            } else if (block.extractionResult?.error) {
-                              // console.log('Rendering: OCR error:', block.extractionResult.error);
-                              return (
-                                <Alert severity="error" sx={{ mt: 1 }}>
-                                  {block.extractionResult.error}
-                                </Alert>
-                              );
-                            } else {
-                              // console.log('Rendering: Waiting for OCR...');
-                              return (
-                                <Box>
-                                  <Typography variant="body2" color="text.secondary">
-                                    {autoOcr ? 'OCR実行待機中...' : 'OCRボタンを押してください'}
-                                  </Typography>
-                                  {!autoOcr && (
-                                    <Button
-                                      variant="outlined"
-                                      size="small"
-                                      startIcon={<PlayArrowIcon />}
-                                      onClick={() => handleManualOCR(block)}
-                                      sx={{ mt: 1 }}
-                                    >
-                                      OCR実行
-                                    </Button>
-                                  )}
-                                </Box>
-                              );
-                            }
-                          })()}
-                        </Box>
-                      );
-                    })
-                  )}
-                </CardContent>
-              </Card>
-
-            </Box>
+                                    <Box mt={2} display="flex" gap={1}>
+                                      <Button
+                                        startIcon={<VisibilityIcon />}
+                                        onClick={() => toggleJsonView(block.blockId)}
+                                        size="small"
+                                        variant="outlined"
+                                      >
+                                        JSON表示
+                                      </Button>
+                                      <Button
+                                        startIcon={<BugReportIcon />}
+                                        onClick={() => handleDebugPreview(block)}
+                                        size="small"
+                                        variant="outlined"
+                                      >
+                                        デバッグ
+                                      </Button>
+                                    </Box>
+                                  </Box>
+                                )}
+                              </Box>
+                            </AccordionDetails>
+                          </Accordion>
+                        );
+                      })}
+                    </Stack>
+                  </Box>
+                </Paper>
+              )}
+            </Stack>
           </Grid>
         </Grid>
 
-        {/* 承認状況セクション（ページ下部、全幅） */}
+        {/* 承認状況セクション */}
         <Box sx={{ mt: 4 }}>
           <ApprovalSection documentId={documentData.id} />
         </Box>
